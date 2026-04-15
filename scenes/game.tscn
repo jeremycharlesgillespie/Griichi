@@ -1,0 +1,58 @@
+[gd_scene load_steps=6 format=3 uid="uid://c3game001"]
+
+[ext_resource type="Script" path="res://scripts/ui/game_controller.gd" id="1_controller"]
+[ext_resource type="Script" path="res://scripts/ui/game_hud.gd" id="2_hud"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_table"]
+size = Vector3(1.6, 0.02, 1.6)
+
+[sub_resource type="StandardMaterial3D" id="Material_table"]
+albedo_color = Color(0.08, 0.32, 0.15, 1)
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 1
+background_color = Color(0.05, 0.08, 0.12, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.3, 0.3, 0.35, 1)
+ambient_light_energy = 0.5
+
+[node name="Game" type="Node3D" node_paths=PackedStringArray("camera", "table_mesh", "hud", "bot_timer")]
+script = ExtResource("1_controller")
+camera = NodePath("Camera3D")
+table_mesh = NodePath("Table")
+hud = NodePath("HUD")
+bot_timer = NodePath("BotTimer")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.5, 0.866025, 0, -0.866025, 0.5, 0, 0.85, 0.5)
+fov = 50.0
+near = 0.01
+
+[node name="Table" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_table")
+material_override = SubResource("Material_table")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.866025, 0.5, 0, -0.5, 0.866025, 0, 2, 1)
+light_energy = 0.8
+shadow_enabled = true
+
+[node name="AmbientLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.5, -0.866025, 0, 0.866025, 0.5, 0, 1, -1)
+light_color = Color(0.8, 0.85, 1, 1)
+light_energy = 0.3
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="HUD" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_hud")
+
+[node name="BotTimer" type="Timer" parent="."]
+one_shot = true

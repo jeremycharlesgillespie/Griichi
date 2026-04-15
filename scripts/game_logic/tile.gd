@@ -1,6 +1,5 @@
 ## tile.gd — Tile types, Tile class, and helper enums.
 ##
-## Ported from OpenRiichi source/Game/Logic/Tile.vala.
 ## All 34 tile types in standard riichi mahjong, plus Wind/TileType
 ## enums and human-readable name formatters.
 class_name Tile
@@ -126,6 +125,67 @@ static func readable_name(type: TileType) -> String:
 		TileType.HATSU: return "Green Dragon"
 		TileType.CHUN:  return "Red Dragon"
 	return "Unknown"
+
+## True if the given type is a wind or dragon honor (displayed as a plain
+## CJK character; other tiles use unicode mahjong glyphs which render
+## differently and typically need a different size).
+static func is_honor_type(type: TileType) -> bool:
+	return type in [TileType.TON, TileType.NAN, TileType.SHAA, TileType.PEI,
+					TileType.HAKU, TileType.HATSU, TileType.CHUN]
+
+
+## Color to draw the tile face glyph in. Returns traditional mahjong
+## colors where possible — bamboo green, winds blue, red dragon red, etc.
+static func glyph_color(type: TileType) -> Color:
+	var t: int = int(type)
+
+	# Man (characters) — red (traditionally number is red, 萬 is black;
+	# with a single monochrome glyph we pick red for the signature color)
+	if t >= int(TileType.MAN1) and t <= int(TileType.MAN9):
+		return Color(0.75, 0.1, 0.1)
+
+	# Pin (circles) — stay black
+	if t >= int(TileType.PIN1) and t <= int(TileType.PIN9):
+		return Color(0.08, 0.08, 0.08)
+
+	# Sou (bamboo) — green
+	if t >= int(TileType.SOU1) and t <= int(TileType.SOU9):
+		return Color(0.15, 0.55, 0.2)
+
+	# Honors
+	match type:
+		TileType.CHUN:  return Color(0.8, 0.1, 0.1)      # Red Dragon
+		TileType.HATSU: return Color(0.15, 0.6, 0.2)     # Green Dragon
+		TileType.HAKU:  return Color(0.15, 0.3, 0.7)     # White Dragon (blue frame)
+		TileType.TON, TileType.NAN, TileType.SHAA, TileType.PEI:
+			return Color(0.1, 0.25, 0.6)                 # Winds — blue
+
+	return Color(0.08, 0.08, 0.08)
+
+
+## Character to display on a tile face. Suit tiles (man/pin/sou) use the
+## unicode mahjong tile glyphs from U+1F007..U+1F021 (they render as clean
+## line art). Honor tiles (winds, dragons) use CJK characters — the
+## mahjong block honors (U+1F000..U+1F006) hit color-emoji fonts on macOS
+## and render as unreadable bitmaps when modulated.
+static func unicode_char(type: TileType) -> String:
+	match type:
+		TileType.TON:   return "東"  # East wind
+		TileType.NAN:   return "南"  # South wind
+		TileType.SHAA:  return "西"  # West wind
+		TileType.PEI:   return "北"  # North wind
+		TileType.CHUN:  return "中"  # Red Dragon (Chun)
+		TileType.HATSU: return "發"  # Green Dragon (Hatsu)
+		TileType.HAKU:  return "白"  # White Dragon (Haku)
+	var t: int = int(type)
+	if t >= int(TileType.MAN1) and t <= int(TileType.MAN9):
+		return String.chr(0x1F007 + (t - int(TileType.MAN1)))
+	if t >= int(TileType.SOU1) and t <= int(TileType.SOU9):
+		return String.chr(0x1F010 + (t - int(TileType.SOU1)))
+	if t >= int(TileType.PIN1) and t <= int(TileType.PIN9):
+		return String.chr(0x1F019 + (t - int(TileType.PIN1)))
+	return "?"
+
 
 ## Internal code name: "Man1", "Pin5", "Ton", etc.
 static func code_name(type: TileType) -> String:

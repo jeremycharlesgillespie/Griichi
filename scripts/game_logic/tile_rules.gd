@@ -1,7 +1,6 @@
 ## tile_rules.gd — Core tile analysis: call eligibility, hand decomposition,
 ## tenpai/shanten detection, and waiting tile calculation.
 ##
-## Ported from OpenRiichi source/Game/Logic/TileRules.vala.
 ## This is the foundation — yaku detection and scoring will be added
 ## incrementally as separate files.
 class_name TileRules
@@ -408,7 +407,7 @@ static func _check_kokushi_tenpai(sorted: Array, melds: Array, readings: Array, 
 static func get_shanten(hand: Array, calls: Array) -> int:
 	var post_draw: bool = (hand.size() % 3) == 2
 	if post_draw:
-		var best: int = 2
+		# 14-tile hand: check if any single discard leaves us tenpai
 		var seen_types: Dictionary = {}
 		for d: Tile in hand:
 			if seen_types.has(int(d.tile_type)):
@@ -417,35 +416,88 @@ static func get_shanten(hand: Array, calls: Array) -> int:
 
 			var reduced: Array = hand.duplicate()
 			reduced.erase(d)
-			var s: int = _get_shanten_waiting(reduced, calls)
-			if s < best:
-				best = s
-			if best == 0:
+			if in_tenpai(reduced, calls):
 				return 0
-		return best
-	return _get_shanten_waiting(hand, calls)
+		# Not tenpai — use fast estimate
+		return _estimate_shanten(hand, calls)
 
-
-static func _get_shanten_waiting(hand: Array, calls: Array) -> int:
+	# 13-tile hand: check tenpai directly
 	if in_tenpai(hand, calls):
 		return 0
+	return _estimate_shanten(hand, calls)
 
-	# Iishanten probe: try swapping one tile and check tenpai
-	var hand_types_seen: Dictionary = {}
-	for drop: Tile in hand:
-		if hand_types_seen.has(int(drop.tile_type)):
-			continue
-		hand_types_seen[int(drop.tile_type)] = true
 
-		for raw_type: int in range(int(Tile.TileType.MAN1), int(Tile.TileType.CHUN) + 1):
-			var swapped: Array = hand.duplicate()
-			swapped.erase(drop)
-			swapped.append(Tile.new(-1, raw_type as Tile.TileType))
+## Fast shanten estimate using mentsu/pair counting heuristic.
+## Counts useful groups (pairs, partial sequences, triplets) and estimates
+## distance to a complete hand. Much faster than brute-force tile swapping.
+static func _estimate_shanten(hand: Array, calls: Array) -> int:
+	var tiles: Array = hand.duplicate()
 
-			if in_tenpai(swapped, calls):
-				return 1
+	# Count how many melds are provided by calls
+	var call_melds: int = 0
+	if calls != null:
+		for call in calls:
+			call_melds += 1
 
-	return 2
+	# We need (4 - call_melds) melds + 1 pair from the hand tiles
+	var needed_melds: int = 4 - call_melds
+
+	# Count tile types
+	var type_counts: Dictionary = {}
+	for tile: Tile in tiles:
+		var t: int = int(tile.tile_type)
+		type_counts[t] = type_counts.get(t, 0) + 1
+
+	# Greedily count complete groups, then partial groups
+	var complete_melds: int = 0
+	var pairs: int = 0
+	var partial: int = 0  # Pairs or adjacent tiles that could become melds
+
+	# Work on a copy of counts
+	var counts: Dictionary = type_counts.duplicate()
+
+	# 1. Extract triplets
+	for t: int in counts.keys():
+		while counts[t] >= 3 and complete_melds < needed_melds:
+			counts[t] -= 3
+			complete_melds += 1
+
+	# 2. Extract sequences (suit tiles only)
+	for base: int in [int(Tile.TileType.MAN1), int(Tile.TileType.PIN1), int(Tile.TileType.SOU1)]:
+		for offset: int in range(7):  # 1-7 can start a sequence
+			var t1: int = base + offset
+			var t2: int = base + offset + 1
+			var t3: int = base + offset + 2
+			while counts.get(t1, 0) >= 1 and counts.get(t2, 0) >= 1 and counts.get(t3, 0) >= 1 \
+				and complete_melds < needed_melds:
+				counts[t1] -= 1
+				counts[t2] -= 1
+				counts[t3] -= 1
+				complete_melds += 1
+
+	# 3. Count pairs
+	for t: int in counts.keys():
+		if counts[t] >= 2:
+			pairs += 1
+			counts[t] -= 2
+
+	# 4. Count partial sequences (adjacent tiles)
+	for base: int in [int(Tile.TileType.MAN1), int(Tile.TileType.PIN1), int(Tile.TileType.SOU1)]:
+		for offset: int in range(8):
+			var t1: int = base + offset
+			var t2: int = base + offset + 1
+			if counts.get(t1, 0) >= 1 and counts.get(t2, 0) >= 1:
+				counts[t1] -= 1
+				counts[t2] -= 1
+				partial += 1
+
+	# Shanten formula: (needed_melds - complete_melds) * 2 - partial_groups - has_pair
+	var useful_partial: int = mini(partial + pairs, needed_melds - complete_melds)
+	var has_pair: int = 1 if pairs > 0 else 0
+	var shanten: int = (needed_melds - complete_melds) * 2 - useful_partial - has_pair + 1
+
+	# Clamp: 0 means tenpai (already checked above), minimum is 1
+	return maxi(shanten, 1)
 
 
 static func waiting_tiles(hand: Array, calls: Array) -> Array:

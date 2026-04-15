@@ -4,7 +4,7 @@
 [application]
 
 config/name="GRiichi"
-config/description="Japanese Mahjong (Riichi) — Godot 4 port of OpenRiichi"
+config/description="Japanese Mahjong (Riichi)"
 run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.3")
 config/icon="res://icon.svg"
